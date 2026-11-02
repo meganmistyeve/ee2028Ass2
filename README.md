@@ -10,13 +10,10 @@ Shielded from the chaos outside stood our beloved laboratory in E4-03-07, NUS, S
 - **Charges a laser gun** with button presses, then fires automatically once it has enough juice.
 - **Knows when it's been knocked over** and calls for help.
 ## MODES
-#  standby
-does nothing but send sensor readings.
-double press enters battlemode
-#  battlemode
-charge laser gun and destroy zombies
-upside down means rescue mode.
-double press reenters standby
+### standby
+Does nothing but send sensor readings. Double press enters Battle mode.
+### battlemode
+Charge the laser gun and destroy zombies. Upside down means rescue mode. Double press re-enters Standby.
 
 ## The Rules
 
