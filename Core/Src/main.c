@@ -86,9 +86,12 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 //color code
 #define BATTLE_RED  "\033[38;2;245;42;75m"
 #define STANDBY_GREEN  "\033[38;2;158;255;89m"
+#define SHOTFIRED_ORANG  "\033[38;2;255;175;56m"
 #define RESET       "\033[0m"
-
+int last_of_ee2028 = 0;
 int battlemode = 0;
+const int laserMax = 10;
+int laserCount = 0;
 int main(void)
 {
 
@@ -119,9 +122,15 @@ int main(void)
 	uint32_t last_pressure  = HAL_GetTick();
 	uint32_t last_humidity  = HAL_GetTick();
 
-
 	while (1)
 	{
+
+		if(laserCount >= laserMax){
+			laserCount = laserMax;
+		}
+		if (laserCount <=0){
+			laserCount = 0;
+		}
 		uint32_t now = HAL_GetTick();
 		__disable_irq();
 		static uint8_t button_state = BUTTON_IDLE;
@@ -132,6 +141,7 @@ int main(void)
 			if (button_pressed) {
 				button_state = BUTTON_WAIT;
 				button_pressed = 0;
+
 			}
 			break;
 
@@ -139,6 +149,27 @@ int main(void)
 			if (now - last_pressed >= PRESS_WINDOW_MS) {
 				button_state = BUTTON_IDLE;
 				press_type = SINGLE_PRESS;
+
+				if (battlemode % 2 == 1 )
+				{
+					laserCount += 3;
+					char message_print[100];        // UART transmit buffer. See the comment in the line above.
+					sprintf(message_print, "Added 3 Charges; Canister: [%d/10]\r\n\n", laserCount);
+					HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF); //Sending in normal mode
+
+
+
+					if (laserCount >= 5)
+					{
+						laserCount -= 5;        // UART transmit buffer. See the comment in the line above.
+						sprintf(message_print, SHOTFIRED_ORANG"Shot Fired!!!"RESET"; Canister: [%d/10]\r\n\n", laserCount);
+						HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF); //Sending in normal mode
+
+
+					}
+				}
+
+
 			} else if (button_pressed) {
 				button_state = BUTTON_IDLE;
 				press_type = DOUBLE_PRESS;
@@ -192,13 +223,19 @@ int main(void)
 //				}
 //				__enable_irq();
 
-		if (now - last_led >= LED_PERIOD_MS)        // e.g. toggled at 470 → next at 720
+		if (battlemode % 2 == 1)
+		{
+		    if (now - last_led >= 500)
 		    {
-		      last_led += LED_PERIOD_MS;
-		      BSP_LED_Toggle(LED2);
+		        last_led += 500;
+		        BSP_LED_Toggle(LED2);
 		    }
-
-
+		}
+		else
+		{
+		    BSP_LED_On(LED2);
+		    last_led = now;
+		}
 		if (now - last_accel >= ACCEL_PERIOD_MS)
 		{
 			last_accel += ACCEL_PERIOD_MS;
@@ -276,7 +313,7 @@ int main(void)
 	}
 
 }
-
+void
 //UART stuff from LAB
 static void UART1_Init(void)
 {
