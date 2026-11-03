@@ -50,6 +50,11 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_magneto.h \
  ../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/../Components/lis3mdl/lis3mdl.h \
  ../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/../Components/lis3mdl/../Common/magneto.h \
+ ../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_psensor.h \
+ ../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/../Components/lps22hb/lps22hb.h \
+ ../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/../Components/lps22hb/../Common/psensor.h \
+ ../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/../Components/lps22hb/../Common/tsensor.h \
+ ../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_hsensor.h \
  ../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01.h \
  ../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_gyro.h
 ../Core/Inc/main.h:
@@ -104,5 +109,10 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_magneto.h:
 ../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/../Components/lis3mdl/lis3mdl.h:
 ../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/../Components/lis3mdl/../Common/magneto.h:
+../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_psensor.h:
+../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/../Components/lps22hb/lps22hb.h:
+../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/../Components/lps22hb/../Common/psensor.h:
+../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/../Components/lps22hb/../Common/tsensor.h:
+../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_hsensor.h:
 ../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01.h:
 ../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_gyro.h:

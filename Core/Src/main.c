@@ -10,6 +10,8 @@
 #include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_accelero.h"
 #include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_tsensor.h"
 #include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_magneto.h"
+#include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_psensor.h"
+#include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_hsensor.h"
 #include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01.h"
 #include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_gyro.h"
 
@@ -20,6 +22,8 @@
 #define TEMP_PERIOD_MS    1000
 #define MAG_PERIOD_MS	1000
 #define GYRO_PERIOD_MS 	1000
+#define PRESSURE_PERIOD_MS  	1000
+#define HUMIDITY_PERIOD_MS  	1000
 #define LED_PERIOD_MS  	1000
 #define PRESS_WINDOW_MS  500
 
@@ -79,6 +83,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	}
 }
 
+//color code
+#define BATTLE_RED  "\033[38;2;245;42;75m"
+#define STANDBY_GREEN  "\033[38;2;158;255;89m"
+#define RESET       "\033[0m"
 
 int battlemode = 0;
 int main(void)
@@ -91,6 +99,8 @@ int main(void)
 
 	/* Peripheral initializations using BSP functions */
 	BSP_ACCELERO_Init();
+	BSP_PSENSOR_Init();
+	BSP_HSENSOR_Init();
 	BSP_TSENSOR_Init();
 	BSP_MAGNETO_Init();
 	BSP_GYRO_Init();
@@ -106,6 +116,8 @@ int main(void)
 	uint32_t last_mag  = HAL_GetTick();
 	uint32_t last_gyro = HAL_GetTick();
 	uint32_t last_led  = HAL_GetTick();
+	uint32_t last_pressure  = HAL_GetTick();
+	uint32_t last_humidity  = HAL_GetTick();
 
 
 	while (1)
@@ -130,8 +142,20 @@ int main(void)
 			} else if (button_pressed) {
 				button_state = BUTTON_IDLE;
 				press_type = DOUBLE_PRESS;
-				printf("Double Pressed\n");
 				battlemode += 1;
+				if(battlemode % 2 == 1){
+
+					char message_print[100];        // UART transmit buffer. See the comment in the line above.
+					sprintf(message_print, BATTLE_RED"Battle Mode Engaged"RESET"\r\n\n");
+					HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF); //Sending in normal mode
+
+				}else{
+
+					char message_print[100];        // UART transmit buffer. See the comment in the line above.
+					sprintf(message_print,STANDBY_GREEN "Stand By Mode Engaged"RESET"\r\n\n");
+					HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF); //Sending in normal mode
+
+				}
 				button_pressed = 0;
 			}
 			break;
@@ -142,6 +166,8 @@ int main(void)
 		switch (print_state) {
 		case (PRINT_RESUME ):
 			if (press_type == DOUBLE_PRESS&& battlemode % 2 ==1) {
+
+
 				print_state = PRINT_PAUSE;
 			}
 		case (PRINT_PAUSE):
@@ -188,8 +214,10 @@ int main(void)
 
 			if (print_state == PRINT_RESUME){
 
-				char buf[100];
-				sprintf(buf ,"Accel X : %f; Accel Y : %f; Accel Z : %f\n", accel_data[0], accel_data[1], accel_data[2]);
+				char message_print[100];        //Remember \r\n it goes down a line from the start
+				sprintf(message_print, "Accel X : %.2f; Accel Y : %.2f; Accel Z : %.2f (m/s^2)\r\n", accel_data[0], accel_data[1], accel_data[2]);
+				HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF); //Sending in normal mode
+
 			}
 		}
 
@@ -197,9 +225,29 @@ int main(void)
 			last_temp += TEMP_PERIOD_MS;
 			float temp_data = BSP_TSENSOR_ReadTemp();
 			if (print_state == PRINT_RESUME){
-				char buf[100];
-				int len = sprintf(buf, "Temperature : %.2f\r\n", temp_data);
-				HAL_UART_Transmit(&huart1, (uint8_t*)buf, len, 0xFFFF);
+				char message_print[100];        // UART transmit buffer. See the comment in the line above.
+				sprintf(message_print, "Temperature : %.2f (degC)\r\n", temp_data);
+				HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF); //Sending in normal mode
+			}
+		}
+
+		if (now - last_pressure >= PRESSURE_PERIOD_MS){
+			last_pressure += PRESSURE_PERIOD_MS;
+			float temp_data = BSP_PSENSOR_ReadPressure();
+			if (print_state == PRINT_RESUME){
+				char message_print[100];        // UART transmit buffer. See the comment in the line above.
+				sprintf(message_print, "Pressure : %.2f (hPa)\r\n", temp_data);
+				HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF); //Sending in normal mode
+			}
+		}
+
+		if (now - last_humidity >= HUMIDITY_PERIOD_MS){
+			last_humidity += HUMIDITY_PERIOD_MS;
+			float temp_data = BSP_HSENSOR_ReadHumidity();
+			if (print_state == PRINT_RESUME){
+				char message_print[100];
+				sprintf(message_print, "Humidity : %.2f (%%RH)\r\n", temp_data);
+				HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF);
 			}
 		}
 
@@ -220,7 +268,7 @@ int main(void)
 			BSP_GYRO_GetXYZ(gyro_data_i16);
 			if (print_state == PRINT_RESUME){
 				char message_print[100];        // UART transmit buffer. See the comment in the line above.
-				sprintf(message_print,"Gyro X : %d; Gyro Y : %d; Gyro Z : %d\r\n\n", gyro_data_i16[0], gyro_data_i16[1], gyro_data_i16[2]);
+				sprintf(message_print,"Gyro X : %.2f; Gyro Y : %.2f; Gyro Z : %.2f \r\n\n", gyro_data_i16[0], gyro_data_i16[1], gyro_data_i16[2]);
 				HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF);
 			}
 		}
