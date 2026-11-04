@@ -90,6 +90,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 #define SHOTFIRED_ORANG  "\033[38;2;255;175;56m"
 #define RESET       "\033[0m"
 #define DAMAGE_PINK  "\033[38;2;247;77;159m"
+#define CAPTAIN_GOLD  "\033[38;2;255;219;13m"
 //declaring numbers
 //states
 int last_of_ee2028 = 0;
@@ -322,10 +323,21 @@ int main(void)
 
 
 		if (battlemode % 2 == 1 && last_of_ee2028 % 2 == 1) {
+			if (now - attacked_at >= 10000) {
+				char message_print[100];		// UART transmit buffer. See the comment in the line above.
+				sprintf(message_print, CAPTAIN_GOLD"O Captain!\r\nMy Captain"RESET"\r\n");
+				HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF);//Sending in normal mode
+
+				BSP_LED_Off(LED2);
+				HAL_UART_DeInit(&huart1);
+				__disable_irq();
+				while (1) {
+				}
+			}
 			if (now - last_attack_msg >= 1000) {
 				last_attack_msg = now;
 				char message_print[100];
-				sprintf(message_print, DAMAGE_PINK"Drone Was Attacked! "RESET"\r\n");
+				sprintf(message_print, DAMAGE_PINK"Drone Was Attacked! "RESET"%lu\r\n", (unsigned long)((10000 - (now - attacked_at) + 999) / 1000));
 				HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF);
 			}
 		}
@@ -337,6 +349,7 @@ int main(void)
 				BSP_LED_Toggle(LED2);
 			}
 		}
+
 		else if (battlemode % 2 == 1) {
 
 			if (now - last_led >= 500) {
