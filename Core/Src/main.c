@@ -17,6 +17,7 @@
 
 #include "stdio.h"
 #include "string.h"
+#include "math.h"
 
 #define ACCEL_PERIOD_MS   1000
 #define TEMP_PERIOD_MS    1000
@@ -88,10 +89,80 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 #define STANDBY_GREEN  "\033[38;2;158;255;89m"
 #define SHOTFIRED_ORANG  "\033[38;2;255;175;56m"
 #define RESET       "\033[0m"
+#define DAMAGE_PINK  "\033[38;2;247;77;159m"
+//declaring numbers
+//states
 int last_of_ee2028 = 0;
 int battlemode = 0;
+
+//laser
 const int laserMax = 10;
 int laserCount = 0;
+//tilt
+float rot_around_x = 0;
+float rot_around_y = 0;
+uint32_t last_tilt_tick = 0;
+#define TILT_PERIOD_MS  20
+uint8_t  tilt_ready = 0;          // 1 once tiltInit() has a good starting angle
+uint32_t last_tilt_check = 0;
+uint32_t attacked_at = 0;         // when it rolled over (for the 10 s rescue)
+uint32_t last_attack_msg = 0;
+
+uint32_t tiltInit(void){
+
+
+	float accel_data[3];
+	int16_t accel_data_i16[3] = { 0 };			// array to store the x, y and z readings.
+	BSP_ACCELERO_AccGetXYZ(accel_data_i16);		// read accelerometer
+	// the function above returns 16 bit integers which are acceleration in mg (9.8/1000 m/s^2).
+	// Converting to float to print the actual acceleration.
+	accel_data[0] = (float)accel_data_i16[0] * (9.8/1000.0f);//x
+	accel_data[1] = (float)accel_data_i16[1] * (9.8/1000.0f);//y
+	accel_data[2] = (float)accel_data_i16[2] * (9.8/1000.0f);///z
+
+
+	//check if its moving or gravity
+	float mag = sqrtf(accel_data[0]*accel_data[0] + accel_data[1]*accel_data[1] + accel_data[2]*accel_data[2]);
+	if (mag < 6.9f || mag > 12.7f) return 0;
+
+
+
+	rot_around_x = atan2f(accel_data[1],accel_data[2])*180/3.141592653589793;
+	rot_around_y = atan2f(-accel_data[0],sqrtf(accel_data[1]*accel_data[1]+accel_data[2]*accel_data[2]))*180/3.141592653589793;
+	last_tilt_tick = HAL_GetTick();
+	return 1;
+}
+
+uint32_t tiltcheck(void){
+	uint32_t tih = HAL_GetTick();
+	float dt = (tih - last_tilt_tick) / 1000.0f;
+	last_tilt_tick = tih;
+	float gyro[3];
+	BSP_GYRO_GetXYZ(gyro);
+
+	rot_around_x += (gyro[0]) / 1000.0f * dt;
+	rot_around_y += (gyro[1]) / 1000.0f * dt;
+
+	return (fabsf(rot_around_x) >= 120 || fabsf(rot_around_y) >= 120);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 int main(void)
 {
 
@@ -150,7 +221,7 @@ int main(void)
 				button_state = BUTTON_IDLE;
 				press_type = SINGLE_PRESS;
 
-				if (battlemode % 2 == 1 )
+				if (battlemode % 2 == 1 && last_of_ee2028 % 2 == 0)
 				{
 					laserCount += 3;
 					char message_print[100];        // UART transmit buffer. See the comment in the line above.
@@ -173,21 +244,22 @@ int main(void)
 			} else if (button_pressed) {
 				button_state = BUTTON_IDLE;
 				press_type = DOUBLE_PRESS;
-				battlemode += 1;
-				if(battlemode % 2 == 1){
-
-					char message_print[100];        // UART transmit buffer. See the comment in the line above.
-					sprintf(message_print, BATTLE_RED"Battle Mode Engaged"RESET"\r\n\n");
-					HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF); //Sending in normal mode
-
-				}else{
-
-					char message_print[100];        // UART transmit buffer. See the comment in the line above.
-					sprintf(message_print,STANDBY_GREEN "Stand By Mode Engaged"RESET"\r\n\n");
-					HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF); //Sending in normal mode
-
-				}
 				button_pressed = 0;
+				char message_print[100];
+
+				if (last_of_ee2028 % 2 == 1) {
+					last_of_ee2028 += 1;
+					tilt_ready = 0;
+					sprintf(message_print, STANDBY_GREEN"Drone Rescued! Back to Battle Mode"RESET"\r\n\n");
+				} else {
+					battlemode += 1;
+					tilt_ready = 0;
+					if (battlemode % 2 == 1)
+						sprintf(message_print, BATTLE_RED"Battle Mode Engaged"RESET"\r\n\n");
+					else
+						sprintf(message_print, STANDBY_GREEN"Stand By Mode Engaged"RESET"\r\n\n");
+				}
+				HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF); //Sending in normal mode
 			}
 			break;
 		}
@@ -210,6 +282,25 @@ int main(void)
 
 
 
+
+		if (battlemode % 2 == 1 && last_of_ee2028 % 2 == 0) {
+			if (!tilt_ready) {
+				tilt_ready = tiltInit();                     // retries until the board is still
+				last_tilt_check = now;
+			} else if (now - last_tilt_check >= TILT_PERIOD_MS) {
+				last_tilt_check = now;
+				if (tiltcheck()) {                           // past 120 degrees
+					last_of_ee2028 += 1;                     // odd = Last of EE2028
+					attacked_at = now;
+					tilt_ready = 0;
+
+					char message_print[100];
+					sprintf(message_print, DAMAGE_PINK"Critically Damaged; Entered Last_Of_2028 Mode"RESET"\r\n\n");
+					HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF);
+				}
+			}
+		}
+
 //		__disable_irq();                // stop the ISR changing press_count mid-check
 //				if (press_count == 2)
 //				{
@@ -223,18 +314,39 @@ int main(void)
 //				}
 //				__enable_irq();
 
-		if (battlemode % 2 == 1)
-		{
-		    if (now - last_led >= 500)
-		    {
-		        last_led += 500;
-		        BSP_LED_Toggle(LED2);
-		    }
+
+
+
+
+
+
+
+		if (battlemode % 2 == 1 && last_of_ee2028 % 2 == 1) {
+			if (now - last_attack_msg >= 1000) {
+				last_attack_msg = now;
+				char message_print[100];
+				sprintf(message_print, DAMAGE_PINK"Drone Was Attacked! "RESET"\r\n");
+				HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF);
+			}
 		}
-		else
-		{
-		    BSP_LED_On(LED2);
-		    last_led = now;
+
+		/* LED */
+		if (battlemode % 2 == 1 && last_of_ee2028 % 2 == 1) {
+			if (now - last_led >= 250) {
+				last_led += 250;
+				BSP_LED_Toggle(LED2);
+			}
+		}
+		else if (battlemode % 2 == 1) {
+
+			if (now - last_led >= 500) {
+				last_led += 500;
+				BSP_LED_Toggle(LED2);
+			}
+		}
+		else {
+			BSP_LED_On(LED2);
+			last_led = now;
 		}
 		if (now - last_accel >= ACCEL_PERIOD_MS)
 		{
@@ -313,7 +425,10 @@ int main(void)
 	}
 
 }
-void
+
+
+
+
 //UART stuff from LAB
 static void UART1_Init(void)
 {
