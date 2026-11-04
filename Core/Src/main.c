@@ -1,4 +1,4 @@
-  /******************************************************************************
+/******************************************************************************
   * @file           : main.c
   * @brief          : Main program body
   * (c) EE2028 Teaching Team
@@ -12,29 +12,17 @@
 #include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_magneto.h"
 #include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_psensor.h"
 #include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_hsensor.h"
-#include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01.h"
 #include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_gyro.h"
-#include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_psensor.h"
-#include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_hsensor.h"
+#include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01.h"
 
-#include "stdio.h"
-<<<<<<< Updated upstream
-#include "string.h"
-
-#define ACCEL_PERIOD_MS   1000
-#define TEMP_PERIOD_MS    1000
-#define MAG_PERIOD_MS	1000
-#define GYRO_PERIOD_MS 	1000
-#define PRESSURE_PERIOD_MS  	1000
-#define HUMIDITY_PERIOD_MS  	1000
-#define LED_PERIOD_MS  	1000
-=======
+#include <stdio.h>
+#include <string.h>
+#include <stdarg.h>
 #include <math.h>
 
-#define LED_PERIOD_MS  	500
->>>>>>> Stashed changes
-#define PRESS_WINDOW_MS  500
-#define TELEMETRY_PERIOD_MS 1000
+#define LED_PERIOD_MS        500     // toggle every 500 ms = 1 Hz blink
+#define PRESS_WINDOW_MS      500
+#define TELEMETRY_PERIOD_MS  1000
 
 #define STANDBY_MODE 0
 #define BATTLE_MODE  1
@@ -45,9 +33,9 @@
 #define P_HIGH  1030.0f
 #define H_LOW   30.0f    // %RH
 #define H_HIGH  70.0f
-#define A_LOW   5.0f     // m/s^2 (Z-axis) About 9.8 when level. Below 5 means a tilt of more than about 60°. Above 15 means a jolt of more than 1.5 g.
+#define A_LOW   5.0f     // m/s^2 (Z-axis) About 9.8 when level. Below 5 means a tilt of more than about 60 deg. Above 15 means a jolt of more than 1.5 g.
 #define A_HIGH  15.0f
-#define G_HIGH  3.0f     // rad/s About 170 °/s, which counts as uncontrolled spinning
+#define G_HIGH  3.0f     // rad/s About 170 deg/s, which counts as uncontrolled spinning
 #define M_HIGH  300.0f   // uT
 
 #define SINGLE_PRESS 0
@@ -56,51 +44,48 @@
 #define BUTTON_IDLE 0
 #define BUTTON_WAIT 1
 
-<<<<<<< Updated upstream
-#define PRINT_RESUME 0
-#define PRINT_PAUSE 1
+// Sensor indices for the threshold/violation tables below
+#define SENS_T 0		//temperature
+#define SENS_P 1		//pressure
+#define SENS_H 2		//humidity
+#define SENS_A 3		//accelerometer
+#define SENS_G 4		//gyroscope
+#define SENS_M 5		//magnetometer
+#define NUM_SENSORS 6	//total number of sensors
 
-//UART STuffss
-static void UART1_Init(void);
+// Threshold tables (a low limit of -1 means "no low limit")
+static const char  *sensor_name[NUM_SENSORS] = { "T", "P", "H", "A", "G", "M" };
+static const char  *sensor_unit[NUM_SENSORS] = { "C", "hPa", "%RH", "m/s^2", "rad/s", "uT" };
+static const float  sensor_low[NUM_SENSORS]  = { T_LOW,  P_LOW,  H_LOW,  A_LOW,  -1.0f,  -1.0f  }; //G and M will always be positive because they're square roots, "-1" is put here
+static const float  sensor_high[NUM_SENSORS] = { T_HIGH, P_HIGH, H_HIGH, A_HIGH, G_HIGH, M_HIGH };
+
+// Violation tracking for the status report
+static uint8_t  was_violated[NUM_SENSORS]    = {0};   // out of range at the last reading?
+static uint32_t violation_count[NUM_SENSORS] = {0};   // number of separate violations since power-on
+
+// ANSI colour codes for the terminal
+#define BATTLE_RED     "\033[38;2;245;42;75m"
+#define STANDBY_GREEN  "\033[38;2;158;255;89m"
+#define COLOR_RESET    "\033[0m"
+
+// UART
 UART_HandleTypeDef huart1;
+static void UART1_Init(void);
 
-extern void initialise_monitor_handles(void);	// for semi-hosting support (printf)
+// printf-style output over UART1
+static void uart_printf(const char *fmt, ...)
+{
+    char buf[160];
+    va_list args;
+    va_start(args, fmt);
+    int len = vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
 
-//volatile uint8_t  press_count      = 0;
-//volatile uint32_t first_press_tick = 0;
-//volatile uint32_t last_press_tick  = 0;
-//void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-//{
-//	if (GPIO_Pin == USER_BUTTON_PIN)    // PC13, blue button
-//	{
-//		uint32_t now = HAL_GetTick();
-//
-//		if (now - last_press_tick < DEBOUNCE_MS)
-//			return;                     // contact bounce, not a real press
-//		last_press_tick = now;
-//
-//		if (press_count == 1 && (now - first_press_tick) < PRESS_WINDOW_MS)
-//		{
-//			press_count = 2;            // second press inside the window
-//		}
-//		else if (press_count == 0)
-//		{
-//			press_count = 1;            // first press: start the window
-//			first_press_tick = now;
-//		}
-//		// press_count == 2: main loop hasn't handled it yet, ignore extras
-//	}
-//}
+    if (len < 0) return;
+    if (len >= (int)sizeof(buf)) len = sizeof(buf) - 1;   // message was cut off
+    HAL_UART_Transmit(&huart1, (uint8_t *)buf, (uint16_t)len, 0xFFFF);
+}
 
-
-
-
-
-
-=======
-extern void initialise_monitor_handles(void);	// for semi-hosting support (printf)
-
->>>>>>> Stashed changes
 volatile uint8_t button_pressed = 0;
 volatile uint32_t last_pressed = 0;
 
@@ -112,69 +97,108 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	}
 }
 
-<<<<<<< Updated upstream
-//color code
-#define BATTLE_RED  "\033[38;2;245;42;75m"
-#define STANDBY_GREEN  "\033[38;2;158;255;89m"
-#define RESET       "\033[0m"
-=======
-static uint8_t check(const char *name, float v, float lo, float hi, const char *unit)
+// Checks one sensor against its limits, prints a violation line if needed,
+// and counts each new violation once (not once per second while it lasts).
+static uint8_t check(uint8_t id, float v)
 {
-    if (v > hi) {
-        printf("%s: %.2f %s, exceeds threshold of %.2f %s\r\n", name, v, unit, hi, unit);
-        return 1;
-    }
-    if (v < lo) {
-        printf("%s: %.2f %s, below threshold of %.2f %s\r\n", name, v, unit, lo, unit);
-        return 1;
-    }
-    return 0;
-}
->>>>>>> Stashed changes
+    uint8_t bad = 0;
 
-int battlemode = 0;
+    if (v > sensor_high[id]) {
+        uart_printf("%s: %.2f %s, exceeds threshold of %.2f %s\r\n",
+                    sensor_name[id], v, sensor_unit[id], sensor_high[id], sensor_unit[id]);
+        bad = 1;
+    } else if (v < sensor_low[id]) {
+        uart_printf("%s: %.2f %s, below threshold of %.2f %s\r\n",
+                    sensor_name[id], v, sensor_unit[id], sensor_low[id], sensor_unit[id]);
+        bad = 1;
+    }
+
+    if (bad && !was_violated[id]) {
+        violation_count[id]++;               // in range -> out of range: a new violation
+    }
+    was_violated[id] = bad;
+
+    return bad;
+}
+
+// One-off status report, sent on a single press in STANDBY_MODE
+static void print_status_report(void)
+{
+    uint32_t s = HAL_GetTick() / 1000;       // uptime in seconds
+    uint32_t total = 0;
+
+    uart_printf("\r\n========== STATUS REPORT ==========\r\n");
+    uart_printf("Uptime: %02lu:%02lu:%02lu\r\n", s / 3600, (s / 60) % 60, s % 60); //00:04:37 means the board has been running for 4 minutes and 37 seconds
+    uart_printf("Thresholds and violations since power-on:\r\n");
+
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+        const char *now_state = was_violated[i] ? "OUT OF RANGE" : "OK";
+
+        if (sensor_low[i] < 0.0f) {          // no low limit
+            uart_printf("  %s: below %.2f %s | violations: %lu | now: %s\r\n",
+                        sensor_name[i], sensor_high[i], sensor_unit[i],
+                        violation_count[i], now_state);
+        } else {
+            uart_printf("  %s: %.2f to %.2f %s | violations: %lu | now: %s\r\n",
+                        sensor_name[i], sensor_low[i], sensor_high[i], sensor_unit[i],
+                        violation_count[i], now_state);
+        }
+        total += violation_count[i];
+    }
+
+    uart_printf("Total violations: %lu\r\n", total);
+    uart_printf("===================================\r\n\r\n");
+}
+
+// Prints one line of the startup check, e.g. "  Pressure      OK"
+static void report_init(const char *name, uint8_t ok)
+{
+    uart_printf("  %-13s %s\r\n", name, ok ? "OK" : "FAILED");
+}
+
 int main(void)
 {
-
-	initialise_monitor_handles(); // for semi-hosting support (printf)
-
 	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
 	HAL_Init();
 
-	/* Peripheral initializations using BSP functions */
-	BSP_ACCELERO_Init();
-	BSP_PSENSOR_Init();
-	BSP_HSENSOR_Init();
-	BSP_TSENSOR_Init();
-	BSP_MAGNETO_Init();
-	BSP_GYRO_Init();
-	BSP_HSENSOR_Init();
-	BSP_PSENSOR_Init();
+	UART1_Init();                    // start UART first so the check results can be printed
+
+	uart_printf(STANDBY_GREEN "Entering STANDBY MODE" COLOR_RESET "\r\n");
+
+	/* Sensor startup check: each BSP init returns OK (0) if the sensor responded */
+	uart_printf("\r\nSensor startup check:\r\n");
+	uint8_t fails = 0;
+	uint8_t ok;
+
+	ok = (BSP_ACCELERO_Init() == ACCELERO_OK); report_init("Accelerometer", ok); fails += !ok;
+	ok = (BSP_GYRO_Init()     == GYRO_OK);     report_init("Gyroscope", ok);     fails += !ok;
+	ok = (BSP_MAGNETO_Init()  == MAGNETO_OK);  report_init("Magnetometer", ok);  fails += !ok;
+	ok = (BSP_TSENSOR_Init()  == TSENSOR_OK);  report_init("Temperature", ok);   fails += !ok;
+	ok = (BSP_HSENSOR_Init()  == HSENSOR_OK);  report_init("Humidity", ok);      fails += !ok;
+	ok = (BSP_PSENSOR_Init()  == PSENSOR_OK);  report_init("Pressure", ok);      fails += !ok;
+
+	if (fails == 0) {
+		uart_printf("All sensors OK\r\n\r\n");
+	} else {
+		uart_printf("WARNING: %d sensor(s) failed to start, readings may be invalid\r\n\r\n", fails);
+	}
+
 	BSP_LED_Init(LED2);
 	BSP_PB_Init(BUTTON_USER, BUTTON_MODE_EXTI);
 
-<<<<<<< Updated upstream
-	UART1_Init();
+	// Reference pressure at power-on (average of 10 readings for stability)
+	    	float p0 = 0.0f;
+	    	for (int i = 0; i < 10; i++) {
+	    		HAL_Delay(50);
+	    		p0 += BSP_PSENSOR_ReadPressure();
+	    	}
+	    	p0 /= 10.0f;
+	    	float alt_filt = 0.0f;      // smoothed altitude, starts at 0 m
+	    	float t_f = 0.0f, h_f = 0.0f, m_f = 0.0f;   // smoothed T, H, M
+	    	uint8_t filt_ready = 0;                     // 0 until the first reading
 
-//	uint8_t paused = 0;
-
-	uint32_t last_accel = HAL_GetTick();
-	uint32_t last_temp  = HAL_GetTick();
-	uint32_t last_mag  = HAL_GetTick();
-	uint32_t last_gyro = HAL_GetTick();
-	uint32_t last_led  = HAL_GetTick();
-	uint32_t last_pressure  = HAL_GetTick();
-	uint32_t last_humidity  = HAL_GetTick();
-=======
-	uint32_t last_led  = HAL_GetTick();
+	uint32_t last_led       = HAL_GetTick();
 	uint32_t last_telemetry = HAL_GetTick();
->>>>>>> Stashed changes
-
-	//printf("Entering STANDBY MODE\r\n");
-
-	char standby_print[100];        // UART transmit buffer. See the comment in the line above.
-	sprintf(standby_print,"Entering STANDBY MODE\r\n");
-	HAL_UART_Transmit(&huart1, (uint8_t*)standby_print, strlen(standby_print),0xFFFF);
 
 	uint8_t mode = STANDBY_MODE;
 	BSP_LED_On(LED2);
@@ -204,58 +228,29 @@ int main(void)
 			} else if (button_pressed) {
 				button_state = BUTTON_IDLE;
 				press_type = DOUBLE_PRESS;
-				battlemode += 1;
-				if(battlemode % 2 == 1){
-
-					char message_print[100];        // UART transmit buffer. See the comment in the line above.
-					sprintf(message_print, BATTLE_RED"Battle Mode Engaged"RESET"\r\n\n");
-					HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF); //Sending in normal mode
-
-				}else{
-
-					char message_print[100];        // UART transmit buffer. See the comment in the line above.
-					sprintf(message_print,STANDBY_GREEN "Stand By Mode Engaged"RESET"\r\n\n");
-					HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF); //Sending in normal mode
-
-				}
 				button_pressed = 0;
 				press_detected = 1;
 			}
 			break;
 		}
 
-<<<<<<< Updated upstream
-		static uint8_t print_state = PRINT_RESUME;
-
-		switch (print_state) {
-		case (PRINT_RESUME ):
-			if (press_type == DOUBLE_PRESS&& battlemode % 2 ==1) {
-
-
-				print_state = PRINT_PAUSE;
-			}
-		case (PRINT_PAUSE):
-			if (press_type == DOUBLE_PRESS&& battlemode % 2 ==0) {
-				print_state = PRINT_RESUME;
-			}
-		}
-=======
->>>>>>> Stashed changes
 		__enable_irq();
 
 		if (press_detected && press_type == DOUBLE_PRESS) {
 			if (mode == STANDBY_MODE) {
 				mode = BATTLE_MODE;
-				printf("Entering BATTLE MODE\r\n");
-				last_led = now;
+				uart_printf(BATTLE_RED "Entering BATTLE MODE" COLOR_RESET "\r\n");
+				last_led = now;                  // restart blink timing
 			} else {
 				mode = STANDBY_MODE;
-				printf("Entering STANDBY MODE\r\n");
+				uart_printf(STANDBY_GREEN "Entering STANDBY MODE" COLOR_RESET "\r\n");
 				BSP_LED_On(LED2);
 			}
 		} else if (press_detected && press_type == SINGLE_PRESS) {
 			if (mode == BATTLE_MODE) {
 				// LASERGUN_CHARGING goes here
+			} else {
+				print_status_report();           // STANDBY: user button single press
 			}
 		}
 
@@ -268,120 +263,64 @@ int main(void)
 		{
 		    last_telemetry += TELEMETRY_PERIOD_MS;
 
-		    float t = BSP_TSENSOR_ReadTemp();
-		    float p = BSP_PSENSOR_ReadPressure();
-		    float h = BSP_HSENSOR_ReadHumidity();
+		    float t = BSP_TSENSOR_ReadTemp();        // C
+		    float p = BSP_PSENSOR_ReadPressure();    // hPa
+		    float alt = 44330.0f * (1.0f - powf(p / p0, 1.0f / 5.255f));   // m, relative to start, calculate height
+		    alt_filt += 0.2f * (alt - alt_filt);   // exponential moving average
+		    float h = BSP_HSENSOR_ReadHumidity();    // %RH
 
-<<<<<<< Updated upstream
-			if (print_state == PRINT_RESUME){
-
-				char message_print[100];        //Remember \r\n it goes down a line from the start
-				sprintf(message_print, "Accel X : %.2f; Accel Y : %.2f; Accel Z : %.2f (m/s^2)\r\n", accel_data[0], accel_data[1], accel_data[2]);
-				HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF); //Sending in normal mode
-
-			}
-		}
-
-		if (now - last_temp >= TEMP_PERIOD_MS){
-			last_temp += TEMP_PERIOD_MS;
-			float temp_data = BSP_TSENSOR_ReadTemp();
-			if (print_state == PRINT_RESUME){
-				char message_print[100];        // UART transmit buffer. See the comment in the line above.
-				sprintf(message_print, "Temperature : %.2f (degC)\r\n", temp_data);
-				HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF); //Sending in normal mode
-			}
-		}
-
-		if (now - last_pressure >= PRESSURE_PERIOD_MS){
-			last_pressure += PRESSURE_PERIOD_MS;
-			float temp_data = BSP_PSENSOR_ReadPressure();
-			if (print_state == PRINT_RESUME){
-				char message_print[100];        // UART transmit buffer. See the comment in the line above.
-				sprintf(message_print, "Pressure : %.2f (hPa)\r\n", temp_data);
-				HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF); //Sending in normal mode
-			}
-		}
-
-		if (now - last_humidity >= HUMIDITY_PERIOD_MS){
-			last_humidity += HUMIDITY_PERIOD_MS;
-			float temp_data = BSP_HSENSOR_ReadHumidity();
-			if (print_state == PRINT_RESUME){
-				char message_print[100];
-				sprintf(message_print, "Humidity : %.2f (%%RH)\r\n", temp_data);
-				HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF);
-			}
-		}
-
-		if (now - last_mag >= MAG_PERIOD_MS){
-			last_mag += MAG_PERIOD_MS;
-			int16_t mag_data_i16[3] = { 0 };       // X, Y, Z
-			BSP_MAGNETO_GetXYZ(mag_data_i16);
-			if (print_state == PRINT_RESUME){
-				char message_print[100];        // UART transmit buffer. See the comment in the line above.
-				sprintf(message_print,"Mag X : %d; Mag Y : %d; Mag Z : %d (mGauss)\r\n", mag_data_i16[0], mag_data_i16[1], mag_data_i16[2]);
-				HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF); //Sending in normal mode
-			}
-		}
-
-		if (now - last_gyro >= GYRO_PERIOD_MS){
-			last_gyro += GYRO_PERIOD_MS;
-			float gyro_data_i16[3] = {0};
-			BSP_GYRO_GetXYZ(gyro_data_i16);
-			if (print_state == PRINT_RESUME){
-				char message_print[100];        // UART transmit buffer. See the comment in the line above.
-				sprintf(message_print,"Gyro X : %.2f; Gyro Y : %.2f; Gyro Z : %.2f \r\n\n", gyro_data_i16[0], gyro_data_i16[1], gyro_data_i16[2]);
-				HAL_UART_Transmit(&huart1, (uint8_t*)message_print, strlen(message_print),0xFFFF);
-			}
-		}
-
-=======
-		    int16_t accel_data_i16[3] = {0};
+		    int16_t accel_data_i16[3] = {0};         // mg
 		    BSP_ACCELERO_AccGetXYZ(accel_data_i16);
-		    float a = accel_data_i16[2] * (9.8f / 1000.0f);
+		    float a = accel_data_i16[2] * (9.8f / 1000.0f);   // m/s^2, Z-axis
 
-		    float gyro_data_i16[3] = {0};
+		    float gyro_data_i16[3] = {0};            // float mdps, not int16
 		    BSP_GYRO_GetXYZ(gyro_data_i16);
-		    float gx = gyro_data_i16[0] / 1000.0f * (float)M_PI / 180.0f;
+		    float gx = gyro_data_i16[0] / 1000.0f * (float)M_PI / 180.0f;   // rad/s
 		    float gy = gyro_data_i16[1] / 1000.0f * (float)M_PI / 180.0f;
 		    float gz = gyro_data_i16[2] / 1000.0f * (float)M_PI / 180.0f;
 		    float g = sqrtf(gx * gx + gy * gy + gz * gz);
 
-		    int16_t mag_data_i16[3] = {0};
+		    int16_t mag_data_i16[3] = {0};           // mGauss
 		    BSP_MAGNETO_GetXYZ(mag_data_i16);
-		    float mx = mag_data_i16[0] * 0.1f;
+		    float mx = mag_data_i16[0] * 0.1f;       // uT (1 mG = 0.1 uT)
 		    float my = mag_data_i16[1] * 0.1f;
 		    float mz = mag_data_i16[2] * 0.1f;
 		    float m = sqrtf(mx * mx + my * my + mz * mz);
 
+		    if (!filt_ready) {          // first reading: start the filters at the real value
+		        t_f = t;
+		        h_f = h;
+		        m_f = m;
+		        filt_ready = 1;
+		    } else {
+		        t_f += 0.2f * (t - t_f);
+		        h_f += 0.2f * (h - h_f);
+		        m_f += 0.2f * (m - m_f);
+		    }
+
 		    uint8_t violated = 0;
-		    violated |= check("T", t, T_LOW, T_HIGH, "C");
-		    violated |= check("P", p, P_LOW, P_HIGH, "hPa");
-		    violated |= check("H", h, H_LOW, H_HIGH, "%RH");
-		    violated |= check("A", a, A_LOW, A_HIGH, "m/s^2");
-		    violated |= check("G", g, -1.0f, G_HIGH, "rad/s");   // magnitude can't be negative, so no low limit
-		    violated |= check("M", m, -1.0f, M_HIGH, "uT");
+		    violated |= check(SENS_T, t_f);
+		    violated |= check(SENS_H, h_f);
+		    violated |= check(SENS_M, m_f);
+		    violated |= check(SENS_P, p);
+		    violated |= check(SENS_A, a);
+		    violated |= check(SENS_G, g);
 
 		    if (!violated) {
-		        // printf("T: %.2f C, P: %.2f hPa, H: %.2f %%RH, A: %.2f m/s^2, G: %.2f rad/s, M: %.2f uT\r\n",
-		        //        t, p, h, a, g, m);
-
-				char violated_print[100];        // UART transmit buffer. See the comment in the line above.
-				sprintf(violated_print,"T: %.2f C, P: %.2f hPa, H: %.2f %%RH, A: %.2f m/s^2, G: %.2f rad/s, M: %.2f uT\r\n",
-		               t, p, h, a, g, m);
-				HAL_UART_Transmit(&huart1, (uint8_t*)violated_print, strlen(violated_print),0xFFFF);
+		        uart_printf("T: %.2f C, P: %.2f hPa (Alt: %.1f m), H: %.2f %%RH, A: %.2f m/s^2, G: %.2f rad/s, M: %.2f uT\r\n",
+		                    t_f, p, alt_filt, h_f, a, g, m_f);
 		    }
 		}
->>>>>>> Stashed changes
 	}
 
 }
 
-//UART stuff from LAB
+// UART stuff from LAB
 static void UART1_Init(void)
 {
         /* Pin configuration for UART. BSP_COM_Init() can do this automatically */
         __HAL_RCC_GPIOB_CLK_ENABLE();
-         __HAL_RCC_USART1_CLK_ENABLE();
+        __HAL_RCC_USART1_CLK_ENABLE();
 
         GPIO_InitTypeDef GPIO_InitStruct = {0};
         GPIO_InitStruct.Alternate = GPIO_AF7_USART1;
@@ -402,12 +341,9 @@ static void UART1_Init(void)
         huart1.Init.OverSampling = UART_OVERSAMPLING_16;
         huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
         huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+
         if (HAL_UART_Init(&huart1) != HAL_OK)
         {
           while(1);
         }
-
 }
-
-
-

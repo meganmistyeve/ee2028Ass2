@@ -1,9 +1,7 @@
-<<<<<<< Updated upstream
-../Core/Src/main.c:79:6:HAL_GPIO_EXTI_Callback	2
-../Core/Src/main.c:92:5:main	26
-../Core/Src/main.c:281:13:UART1_Init	2
-=======
-../Core/Src/main.c:50:6:HAL_GPIO_EXTI_Callback	3
-../Core/Src/main.c:58:16:check	3
-../Core/Src/main.c:71:5:main	13
->>>>>>> Stashed changes
+../Core/Src/main.c:76:13:uart_printf	3
+../Core/Src/main.c:92:6:HAL_GPIO_EXTI_Callback	3
+../Core/Src/main.c:102:16:check	5
+../Core/Src/main.c:125:13:print_status_report	4
+../Core/Src/main.c:154:13:report_init	2
+../Core/Src/main.c:159:5:main	19
+../Core/Src/main.c:319:13:UART1_Init	2
