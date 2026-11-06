@@ -152,6 +152,19 @@ uint32_t tiltcheck(void){
 
 	return (fabsf(rot_around_x) >= 120 || fabsf(rot_around_y) >= 120);
 }
+//checking if its actually upright before the thing.. rescue else it wont save
+uint8_t board_upright(void){
+	int16_t a[3] = { 0 };
+	BSP_ACCELERO_AccGetXYZ(a);
+	float x = (float)a[0] * (9.8f / 1000.0f);
+	float y = (float)a[1] * (9.8f / 1000.0f);
+	float z = (float)a[2] * (9.8f / 1000.0f);
+
+	float mag = sqrtf(x*x + y*y + z*z);
+	if (mag < 6.9f || mag > 12.7f) return 0;
+
+	return z > 0.0f;
+}
 
 // Checks one sensor against its limits, prints a violation line if needed,
 // and counts each new violation once (not once per second while it lasts).
@@ -294,13 +307,17 @@ int main(void)
 
 		if (press_detected && press_type == DOUBLE_PRESS) {
 			if (mode == BATTLE_MODE && last_of_ee2028 % 2 == 1) {
-				last_of_ee2028 += 1;
-				tilt_ready = 0;
-				uart_printf(STANDBY_GREEN "Drone Rescued! Back to Battle Mode" COLOR_RESET "\r\n\n");
+				if (board_upright()) {
+					last_of_ee2028 += 1;
+					tilt_ready = 0;
+					uart_printf(STANDBY_GREEN "Drone Rescued! Back to Battle Mode" COLOR_RESET "\r\n\n");
+				} else {
+					uart_printf(DAMAGE_PINK "Rescue failed: drone is upside down and unstable" COLOR_RESET "\r\n\n");
+				}
 			} else if (mode == STANDBY_MODE) {
 				mode = BATTLE_MODE;
 				tilt_ready = 0;
-				uart_printf(BATTLE_RED "Battle Mode Engaged" COLOR_RESET "\r\n\n");
+				uart_printf(BATTLE_RED "Entering BATTLE MODE" COLOR_RESET "\r\n\n");
 				last_led = now;                  // restart blink timing
 			} else {
 				mode = STANDBY_MODE;
@@ -365,7 +382,8 @@ int main(void)
 				last_led += LED_PERIOD_MS;
 				BSP_LED_Toggle(LED2);
 			}
-		} else {
+		}
+		else {
 			BSP_LED_On(LED2);
 			last_led = now;
 		}
@@ -420,7 +438,7 @@ int main(void)
 		    violated |= check(SENS_G, g);
 
 		    if (!violated) {
-		        uart_printf("T: %.2f C, P: %.2f hPa (Alt: %.1f m), H: %.2f %%RH, A: %.2f m/s^2, G: %.2f rad/s, M: %.2f uT\r\n",
+		        uart_printf("T: %.2f C, P: %.2f hPa (Alt: %.1f m), H: %.2f %%RH, A: %.2f m/s^2, G: %.2f rad/s, M: %.2f uT\r\n\n",
 		                    t_f, p, alt_filt, h_f, a, g, m_f);
 		    }
 		}
@@ -460,3 +478,4 @@ static void UART1_Init(void)
           while(1);
         }
 }
+//the days blurred together...
