@@ -1,0 +1,2 @@
+../Drivers/u8g2/csrc/u8x8_d_ch1115_88x48.c:94:13:u8x8_d_ch1115_88x48_clear_hidden_pages	24	static
+../Drivers/u8g2/csrc/u8x8_d_ch1115_88x48.c:117:9:u8x8_d_ch1115_88x48	32	static

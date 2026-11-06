@@ -33,4 +33,5 @@ Drivers/BSP/Components/lsm6dsl \
 Drivers/BSP/Components/st25dv \
 Drivers/STM32L4xx_HAL_Driver/Src/Legacy \
 Drivers/STM32L4xx_HAL_Driver/Src \
+Drivers/u8g2/csrc \
 

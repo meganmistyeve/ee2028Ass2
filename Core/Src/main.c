@@ -346,11 +346,17 @@ static void print_status_report(void)
     uint32_t total = 0;
 
     uart_printf("\r\n========== STATUS REPORT ==========\r\n");
-    oled_printf("\r\n========== STATUS REPORT ==========\r\n");
+    oled_printf("\r\nSTATUS REPORT\r\n");
+    oled_flush();
+    HAL_Delay(1000);
     uart_printf("Uptime: %02lu:%02lu:%02lu\r\n", s / 3600, (s / 60) % 60, s % 60); //00:04:37 means the board has been running for 4 minutes and 37 seconds
     oled_printf("Uptime: %02lu:%02lu:%02lu\r\n", s / 3600, (s / 60) % 60, s % 60);
+    oled_flush();
+    HAL_Delay(1000);
     uart_printf("Thresholds and violations since power-on:\r\n");
     oled_printf("Thresholds and violations since power-on:\r\n");
+    oled_flush();
+    HAL_Delay(1000);
 
     for (uint8_t i = 0; i < NUM_SENSORS; i++) {
         const char *now_state = was_violated[i] ? "OUT OF RANGE" : "OK";
@@ -372,11 +378,11 @@ static void print_status_report(void)
         }
         total += violation_count[i];
     }
-
+    oled_flush();
+    HAL_Delay(1000);
     uart_printf("Total violations: %lu\r\n", total);
     oled_printf("Total violations: %lu\r\n", total);
     uart_printf("===================================\r\n\r\n");
-    oled_printf("===================================\r\n\r\n");
 }
 
 // Prints one line of the startup check, e.g. "  Pressure      OK"
@@ -391,19 +397,20 @@ int main(void)
 	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
 	HAL_Init();
 
-    uint32_t s2 = HAL_GetTick() ;//using this to calibrate uart + oled so messages aint cramped at start up
 	UART1_Init();                    // start UART first so the check results can be printed
 	oled_begin();
 
 	uart_printf(STANDBY_GREEN "Entering STANDBY MODE" COLOR_RESET "\r\n");
 	oled_printf(STANDBY_GREEN "Entering STANDBY MODE" COLOR_RESET "\r\n");
-
+	oled_flush();
+	HAL_Delay(1500);
 
 
 	/* Sensor startup check: each BSP init returns OK (0) if the sensor responded */
 	uart_printf("\r\nSensor startup check:\r\n");
 	oled_printf("\r\nSensor startup check:\r\n");
-
+	oled_flush();
+	HAL_Delay(1500);
 
 
 	uint8_t fails = 0;
@@ -417,10 +424,14 @@ int main(void)
 	ok = (BSP_PSENSOR_Init()  == PSENSOR_OK);  report_init("Pressure", ok);      fails += !ok;
 
 	if (fails == 0) {
+		oled_flush();
+		HAL_Delay(1500);
 		uart_printf("All sensors OK\r\n\r\n");
 		oled_printf("All sensors OK\r\n\r\n");
 
 	} else {
+		oled_flush();
+		HAL_Delay(1500);
 		uart_printf("WARNING: %d sensor(s) failed to start, readings may be invalid\r\n\r\n", fails);
 		oled_printf("WARNING: %d sensor(s) failed to start, readings may be invalid\r\n\r\n", fails);
 

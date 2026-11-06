@@ -1,0 +1,6 @@
+../Drivers/u8g2/csrc/u8x8_d_mt12864k.c:100:13:u8x8_mt12864k_select	16	static
+../Drivers/u8g2/csrc/u8x8_d_mt12864k.c:109:13:u8x8_mt12864k_write_register	16	static
+../Drivers/u8g2/csrc/u8x8_d_mt12864k.c:118:13:u8x8_mt12864k_reset	16	static
+../Drivers/u8g2/csrc/u8x8_d_mt12864k.c:133:13:u8x8_mt12864k_send_sequence	24	static
+../Drivers/u8g2/csrc/u8x8_d_mt12864k.c:155:13:u8x8_mt12864k_out	32	static
+../Drivers/u8g2/csrc/u8x8_d_mt12864k.c:214:9:u8x8_d_mt12864k_128x64	48	static
