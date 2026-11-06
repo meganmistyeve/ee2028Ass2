@@ -23,7 +23,6 @@ Charge the laser gun and destroy zombies. Upside down means rescue mode. Double 
 
 ## Resource
 
-- 
 - OLED: [Olikraus' u8g2 lib](https://github.com/olikraus/u8g2)
 - 
 ## Team

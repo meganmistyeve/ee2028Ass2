@@ -14,6 +14,7 @@
 #include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_hsensor.h"
 #include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_gyro.h"
 #include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01.h"
+#include "../../Drivers/u8g2/csrc/u8g2.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -101,6 +102,149 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	}
 }
 
+
+
+
+
+
+
+
+//Oled Setups
+static I2C_HandleTypeDef hi2c_oled;
+static char oled_text[1024];
+static uint16_t oled_len = 0;
+static uint32_t oled_last = 0;
+static uint8_t oled_dirty = 0;
+static u8g2_t u8g2;
+
+static uint8_t oled_i2c(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr)
+{
+	static uint8_t buf[32];
+	static uint8_t len;
+	switch (msg) {
+	case U8X8_MSG_BYTE_START_TRANSFER:
+		len = 0;
+		break;
+	case U8X8_MSG_BYTE_SEND:
+		memcpy(&buf[len], arg_ptr, arg_int);
+		len += arg_int;
+		break;
+	case U8X8_MSG_BYTE_END_TRANSFER:
+		HAL_I2C_Master_Transmit(&hi2c_oled, u8x8_GetI2CAddress(u8x8), buf, len, 100);
+		break;
+	}
+	return 1;
+}
+
+static uint8_t oled_delay(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr)
+{
+	if (msg == U8X8_MSG_DELAY_MILLI) HAL_Delay(arg_int);
+	return 1;
+}
+
+static void oled_print(const char *s)
+{
+	const char *row[40];
+	uint8_t len[40];
+	uint8_t n = 0;
+	while (*s && n < 40) {
+		uint8_t k = 0;
+		while (s[k] && s[k] != '\n' && k < 25) k++;
+		if (k == 25 && s[k] && s[k] != '\n' && s[k] != ' ') {
+			uint8_t b = k;
+			while (b > 0 && s[b - 1] != ' ') b--;
+			if (b > 0) k = b;
+		}
+		row[n] = s;
+		len[n] = k;
+		n++;
+		s += k;
+		while (*s == ' ') s++;
+		if (*s == '\n') s++;
+	}
+	uint8_t first = (n > 8) ? n - 8 : 0;
+	char line[26];
+	u8g2_ClearBuffer(&u8g2);
+	for (uint8_t i = first; i < n; i++) {
+		memcpy(line, row[i], len[i]);
+		line[len[i]] = 0;
+		u8g2_DrawStr(&u8g2, 0, 7 + 8 * (i - first), line);
+	}
+	u8g2_SendBuffer(&u8g2);
+}
+
+static void oled_printf(const char *fmt, ...)
+{
+	char buf[160];
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, args);
+	va_end(args);
+
+	uint32_t t = HAL_GetTick();
+	if (t - oled_last >= 50) oled_len = 0;
+	oled_last = t;
+
+	for (char *p = buf; *p; p++) {
+		char c = *p;
+		if (c == '\033') {
+			while (*p && *p != 'm') p++;
+			if (!*p) break;
+			continue;
+		}
+		if ((c == ',' || c == ';') && p[1] == ' ') {
+			c = '\n';
+			p++;
+		}
+		if (c == '\r') continue;
+		if (c == '\n' && (oled_len == 0 || oled_text[oled_len - 1] == '\n')) continue;
+		if (oled_len < sizeof(oled_text) - 1) oled_text[oled_len++] = c;
+	}
+	oled_text[oled_len] = 0;
+	oled_dirty = 1;
+}
+
+static void oled_flush(void)
+{
+	if (!oled_dirty) return;
+	oled_dirty = 0;
+	oled_print(oled_text);
+}
+
+static void oled_begin(void)
+{
+	__HAL_RCC_GPIOB_CLK_ENABLE();
+	__HAL_RCC_I2C1_CLK_ENABLE();
+
+	GPIO_InitTypeDef g = {0};
+	g.Pin = GPIO_PIN_8 | GPIO_PIN_9;
+	g.Mode = GPIO_MODE_AF_OD;
+	g.Pull = GPIO_PULLUP;
+	g.Speed = GPIO_SPEED_FREQ_HIGH;
+	g.Alternate = GPIO_AF4_I2C1;
+	HAL_GPIO_Init(GPIOB, &g);
+
+	hi2c_oled.Instance = I2C1;
+	hi2c_oled.Init.Timing = 0x00420F13;
+	hi2c_oled.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+	HAL_I2C_Init(&hi2c_oled);
+
+	u8g2_Setup_ssd1306_i2c_128x64_noname_f(&u8g2, U8G2_R0, oled_i2c, oled_delay);
+	u8g2_InitDisplay(&u8g2);
+	u8g2_SetPowerSave(&u8g2, 0);
+	u8g2_SetFont(&u8g2, u8g2_font_5x8_tr);
+	oled_print("");
+}
+//Oled Setups
+
+
+
+
+
+
+
+
+
 int last_of_ee2028 = 0;
 
 const int laserMax = 10;
@@ -175,9 +319,13 @@ static uint8_t check(uint8_t id, float v)
     if (v > sensor_high[id]) {
         uart_printf("%s: %.2f %s, exceeds threshold of %.2f %s\r\n",
                     sensor_name[id], v, sensor_unit[id], sensor_high[id], sensor_unit[id]);
+        oled_printf("%s: %.2f %s, exceeds threshold of %.2f %s\r\n",
+                    sensor_name[id], v, sensor_unit[id], sensor_high[id], sensor_unit[id]);
         bad = 1;
     } else if (v < sensor_low[id]) {
         uart_printf("%s: %.2f %s, below threshold of %.2f %s\r\n",
+                    sensor_name[id], v, sensor_unit[id], sensor_low[id], sensor_unit[id]);
+        oled_printf("%s: %.2f %s, below threshold of %.2f %s\r\n",
                     sensor_name[id], v, sensor_unit[id], sensor_low[id], sensor_unit[id]);
         bad = 1;
     }
@@ -193,12 +341,16 @@ static uint8_t check(uint8_t id, float v)
 // One-off status report, sent on a single press in STANDBY_MODE
 static void print_status_report(void)
 {
+
     uint32_t s = HAL_GetTick() / 1000;       // uptime in seconds
     uint32_t total = 0;
 
     uart_printf("\r\n========== STATUS REPORT ==========\r\n");
+    oled_printf("\r\n========== STATUS REPORT ==========\r\n");
     uart_printf("Uptime: %02lu:%02lu:%02lu\r\n", s / 3600, (s / 60) % 60, s % 60); //00:04:37 means the board has been running for 4 minutes and 37 seconds
+    oled_printf("Uptime: %02lu:%02lu:%02lu\r\n", s / 3600, (s / 60) % 60, s % 60);
     uart_printf("Thresholds and violations since power-on:\r\n");
+    oled_printf("Thresholds and violations since power-on:\r\n");
 
     for (uint8_t i = 0; i < NUM_SENSORS; i++) {
         const char *now_state = was_violated[i] ? "OUT OF RANGE" : "OK";
@@ -207,8 +359,14 @@ static void print_status_report(void)
             uart_printf("  %s: below %.2f %s | violations: %lu | now: %s\r\n",
                         sensor_name[i], sensor_high[i], sensor_unit[i],
                         violation_count[i], now_state);
+            oled_printf("  %s: below %.2f %s | violations: %lu | now: %s\r\n",
+                        sensor_name[i], sensor_high[i], sensor_unit[i],
+                        violation_count[i], now_state);
         } else {
             uart_printf("  %s: %.2f to %.2f %s | violations: %lu | now: %s\r\n",
+                        sensor_name[i], sensor_low[i], sensor_high[i], sensor_unit[i],
+                        violation_count[i], now_state);
+            oled_printf("  %s: %.2f to %.2f %s | violations: %lu | now: %s\r\n",
                         sensor_name[i], sensor_low[i], sensor_high[i], sensor_unit[i],
                         violation_count[i], now_state);
         }
@@ -216,13 +374,16 @@ static void print_status_report(void)
     }
 
     uart_printf("Total violations: %lu\r\n", total);
+    oled_printf("Total violations: %lu\r\n", total);
     uart_printf("===================================\r\n\r\n");
+    oled_printf("===================================\r\n\r\n");
 }
 
 // Prints one line of the startup check, e.g. "  Pressure      OK"
 static void report_init(const char *name, uint8_t ok)
 {
     uart_printf("  %-13s %s\r\n", name, ok ? "OK" : "FAILED");
+    oled_printf("  %-13s %s\r\n", name, ok ? "OK" : "FAILED");
 }
 
 int main(void)
@@ -230,12 +391,21 @@ int main(void)
 	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
 	HAL_Init();
 
+    uint32_t s2 = HAL_GetTick() ;//using this to calibrate uart + oled so messages aint cramped at start up
 	UART1_Init();                    // start UART first so the check results can be printed
+	oled_begin();
 
 	uart_printf(STANDBY_GREEN "Entering STANDBY MODE" COLOR_RESET "\r\n");
+	oled_printf(STANDBY_GREEN "Entering STANDBY MODE" COLOR_RESET "\r\n");
+
+
 
 	/* Sensor startup check: each BSP init returns OK (0) if the sensor responded */
 	uart_printf("\r\nSensor startup check:\r\n");
+	oled_printf("\r\nSensor startup check:\r\n");
+
+
+
 	uint8_t fails = 0;
 	uint8_t ok;
 
@@ -248,8 +418,12 @@ int main(void)
 
 	if (fails == 0) {
 		uart_printf("All sensors OK\r\n\r\n");
+		oled_printf("All sensors OK\r\n\r\n");
+
 	} else {
 		uart_printf("WARNING: %d sensor(s) failed to start, readings may be invalid\r\n\r\n", fails);
+		oled_printf("WARNING: %d sensor(s) failed to start, readings may be invalid\r\n\r\n", fails);
+
 	}
 
 	BSP_LED_Init(LED2);
@@ -274,6 +448,7 @@ int main(void)
 
 	while (1)
 	{
+		oled_flush();
 		uint32_t now = HAL_GetTick();
 		__disable_irq();
 		static uint8_t button_state = BUTTON_IDLE;
@@ -311,17 +486,21 @@ int main(void)
 					last_of_ee2028 += 1;
 					tilt_ready = 0;
 					uart_printf(STANDBY_GREEN "Drone Rescued! Back to Battle Mode" COLOR_RESET "\r\n\n");
+					oled_printf(STANDBY_GREEN "Drone Rescued! Back to Battle Mode" COLOR_RESET "\r\n\n");
 				} else {
 					uart_printf(DAMAGE_PINK "Rescue failed: drone is upside down and unstable" COLOR_RESET "\r\n\n");
+					oled_printf(DAMAGE_PINK "Rescue failed: drone is upside down and unstable" COLOR_RESET "\r\n\n");
 				}
 			} else if (mode == STANDBY_MODE) {
 				mode = BATTLE_MODE;
 				tilt_ready = 0;
 				uart_printf(BATTLE_RED "Entering BATTLE MODE" COLOR_RESET "\r\n\n");
+				oled_printf(BATTLE_RED "Entering BATTLE MODE" COLOR_RESET "\r\n\n");
 				last_led = now;                  // restart blink timing
 			} else {
 				mode = STANDBY_MODE;
 				uart_printf(STANDBY_GREEN "Entering STANDBY MODE" COLOR_RESET "\r\n");
+				oled_printf(STANDBY_GREEN "Entering STANDBY MODE" COLOR_RESET "\r\n");
 				BSP_LED_On(LED2);
 			}
 		} else if (press_detected && press_type == SINGLE_PRESS) {
@@ -330,10 +509,12 @@ int main(void)
 					laserCount += 3;
 					if (laserCount > laserMax) laserCount = laserMax;
 					uart_printf("Added 3 Charges; Canister: [%d/10]\r\n\n", laserCount);
+					oled_printf("Added 3 Charges; Canister: [%d/10]\r\n\n", laserCount);
 
 					if (laserCount >= 5) {
 						laserCount -= 5;
 						uart_printf(SHOTFIRED_ORANG "Shot Fired!!!" COLOR_RESET "; Canister: [%d/10]\r\n\n", laserCount);
+						oled_printf(SHOTFIRED_ORANG "Shot Fired!!!" COLOR_RESET "; Canister: [%d/10]\r\n\n", laserCount);
 					}
 				}
 			} else {
@@ -352,6 +533,7 @@ int main(void)
 					attacked_at = now;
 					tilt_ready = 0;
 					uart_printf(DAMAGE_PINK "Critically Damaged; Entered Last_Of_2028 Mode" COLOR_RESET "\r\n\n");
+					oled_printf(DAMAGE_PINK "Critically Damaged; Entered Last_Of_2028 Mode" COLOR_RESET "\r\n\n");
 				}
 			}
 		}
@@ -359,6 +541,8 @@ int main(void)
 		if (mode == BATTLE_MODE && last_of_ee2028 % 2 == 1) {
 			if (now - attacked_at >= 10000) {
 				uart_printf("\r\n" CAPTAIN_GOLD "O Captain!\r\nMy Captain" COLOR_RESET "\r\n");
+				oled_printf("\r\n" CAPTAIN_GOLD "O Captain!\r\nMy Captain" COLOR_RESET "\r\n");
+				oled_flush();
 				BSP_LED_Off(LED2);
 				HAL_UART_DeInit(&huart1);
 				__disable_irq();
@@ -368,6 +552,7 @@ int main(void)
 			if (now - last_attack_msg >= 1000) {
 				last_attack_msg = now;
 				uart_printf(DAMAGE_PINK "Drone Was Attacked! " COLOR_RESET "%lu\r\n", (unsigned long)((10000 - (now - attacked_at) + 999) / 1000));
+				oled_printf(DAMAGE_PINK "Drone Was Attacked! " COLOR_RESET "%lu\r\n", (unsigned long)((10000 - (now - attacked_at) + 999) / 1000));
 			}
 		}
 
@@ -439,6 +624,8 @@ int main(void)
 
 		    if (!violated) {
 		        uart_printf("T: %.2f C, P: %.2f hPa (Alt: %.1f m), H: %.2f %%RH, A: %.2f m/s^2, G: %.2f rad/s, M: %.2f uT\r\n\n",
+		                    t_f, p, alt_filt, h_f, a, g, m_f);
+		        oled_printf("T: %.2f C, P: %.2f hPa (Alt: %.1f m), H: %.2f %%RH, A: %.2f m/s^2, G: %.2f rad/s, M: %.2f uT\r\n\n",
 		                    t_f, p, alt_filt, h_f, a, g, m_f);
 		    }
 		}
