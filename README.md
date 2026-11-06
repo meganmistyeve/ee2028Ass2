@@ -21,6 +21,11 @@ Charge the laser gun and destroy zombies. Upside down means rescue mode. Double 
 2. **Single press** in Battle mode to charge the laser.
 3. **Double press within 10 seconds to rescue a flipped drone.** Miss it, and the drone sends one last goodbye and goes dark forever to keep the lab's location secret. No pressure.
 
+## Resource
+
+- 
+- OLED: [Olikraus' u8g2 lib](https://github.com/olikraus/u8g2)
+- 
 ## Team
 
 - [@meganmistyeve](https://github.com/meganmistyeve)
