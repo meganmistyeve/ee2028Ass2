@@ -58,7 +58,7 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_gyro.h \
  ../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01.h \
  ../Core/Src/../../Drivers/u8g2/csrc/u8g2.h \
- ../Core/Src/../../Drivers/u8g2/csrc/u8x8.h
+ ../Core/Src/../../Drivers/u8g2/csrc/u8x8.h ../Core/Src/oled_logo.h
 ../Core/Inc/main.h:
 ../Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal.h:
 ../Core/Inc/stm32l4xx_hal_conf.h:
@@ -120,3 +120,4 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Core/Src/../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01.h:
 ../Core/Src/../../Drivers/u8g2/csrc/u8g2.h:
 ../Core/Src/../../Drivers/u8g2/csrc/u8x8.h:
+../Core/Src/oled_logo.h:

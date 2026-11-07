@@ -73,6 +73,9 @@ static uint32_t violation_count[NUM_SENSORS] = {0};   // number of separate viol
 #define CAPTAIN_GOLD     "\033[38;2;255;219;13m"
 #define COLOR_RESET      "\033[0m"
 
+//logo
+#include "oled_logo.h"
+
 // UART
 UART_HandleTypeDef huart1;
 static void UART1_Init(void);
@@ -106,8 +109,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 
 
 
-
-
+//this is code rot why is my button not registering double press?
+//single press in standby have to wait 4 sec of delay so thats why not registering double press.
+//fix: make it wait 500 sec before doing status report
 
 //Oled Setups
 static I2C_HandleTypeDef hi2c_oled;
@@ -309,6 +313,12 @@ uint8_t board_upright(void){
 
 	return z > 0.0f;
 }
+static void oled_logo(void)
+{
+	u8g2_ClearBuffer(&u8g2);
+	u8g2_DrawXBM(&u8g2, 0, 0, 128, 64, logo);
+	u8g2_SendBuffer(&u8g2);
+}
 
 // Checks one sensor against its limits, prints a violation line if needed,
 // and counts each new violation once (not once per second while it lasts).
@@ -346,17 +356,10 @@ static void print_status_report(void)
     uint32_t total = 0;
 
     uart_printf("\r\n========== STATUS REPORT ==========\r\n");
-    oled_printf("\r\nSTATUS REPORT\r\n");
-    oled_flush();
-    HAL_Delay(1000);
     uart_printf("Uptime: %02lu:%02lu:%02lu\r\n", s / 3600, (s / 60) % 60, s % 60); //00:04:37 means the board has been running for 4 minutes and 37 seconds
-    oled_printf("Uptime: %02lu:%02lu:%02lu\r\n", s / 3600, (s / 60) % 60, s % 60);
-    oled_flush();
-    HAL_Delay(1000);
+
     uart_printf("Thresholds and violations since power-on:\r\n");
-    oled_printf("Thresholds and violations since power-on:\r\n");
-    oled_flush();
-    HAL_Delay(1000);
+
 
     for (uint8_t i = 0; i < NUM_SENSORS; i++) {
         const char *now_state = was_violated[i] ? "OUT OF RANGE" : "OK";
@@ -365,24 +368,23 @@ static void print_status_report(void)
             uart_printf("  %s: below %.2f %s | violations: %lu | now: %s\r\n",
                         sensor_name[i], sensor_high[i], sensor_unit[i],
                         violation_count[i], now_state);
-            oled_printf("  %s: below %.2f %s | violations: %lu | now: %s\r\n",
-                        sensor_name[i], sensor_high[i], sensor_unit[i],
-                        violation_count[i], now_state);
         } else {
             uart_printf("  %s: %.2f to %.2f %s | violations: %lu | now: %s\r\n",
-                        sensor_name[i], sensor_low[i], sensor_high[i], sensor_unit[i],
-                        violation_count[i], now_state);
-            oled_printf("  %s: %.2f to %.2f %s | violations: %lu | now: %s\r\n",
                         sensor_name[i], sensor_low[i], sensor_high[i], sensor_unit[i],
                         violation_count[i], now_state);
         }
         total += violation_count[i];
     }
-    oled_flush();
-    HAL_Delay(1000);
     uart_printf("Total violations: %lu\r\n", total);
-    oled_printf("Total violations: %lu\r\n", total);
     uart_printf("===================================\r\n\r\n");
+
+    uint8_t ok_count = 0;
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) ok_count += !was_violated[i];
+    oled_printf("Status report: OK: %d/%d\n", ok_count, NUM_SENSORS);
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+        if (was_violated[i]) oled_printf("%s: OUT OF RANGE\n", sensor_name[i]);
+    }
+
 }
 
 // Prints one line of the startup check, e.g. "  Pressure      OK"
@@ -399,6 +401,8 @@ int main(void)
 
 	UART1_Init();                    // start UART first so the check results can be printed
 	oled_begin();
+	oled_logo();
+	HAL_Delay(3000);
 
 	uart_printf(STANDBY_GREEN "Entering STANDBY MODE" COLOR_RESET "\r\n");
 	oled_printf(STANDBY_GREEN "Entering STANDBY MODE" COLOR_RESET "\r\n");
