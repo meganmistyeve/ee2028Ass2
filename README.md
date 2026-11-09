@@ -9,16 +9,9 @@ Shielded from the chaos outside stood our beloved laboratory in E4-03-07, NUS, S
 - **Raises the alarm** if anything looks off.
 - **Charges a laser gun** with button presses, then fires automatically once it has enough juice.
 - **Knows when it's been knocked over** and calls for help.
-## MODES
-### standby
-Does nothing but send sensor readings. Double press enters Battle mode.
-### battlemode
-Charge the laser gun and destroy zombies. Upside down means rescue mode. Double press re-enters Standby.
-## The Rules
+## Modes & Rules
+![Modes of Operation](OperationStuffsForReadme.png)
 
-1. **Double press** to switch between Standby and Battle mode.
-2. **Single press** in Battle mode to charge the laser.
-3. **Double press within 10 seconds to rescue a flipped drone.** Miss it, and the drone sends one last goodbye and goes dark forever to keep the lab's location secret. No pressure.
 ## Resource
 
 - OLED: [Olikraus' u8g2 lib](https://github.com/olikraus/u8g2)
