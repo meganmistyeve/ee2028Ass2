@@ -14,7 +14,6 @@
 #include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_hsensor.h"
 #include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01_gyro.h"
 #include "../../Drivers/BSP/B-L4S5I-IOT01/stm32l4s5i_iot01.h"
-#include "../../Drivers/u8g2/csrc/u8g2.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -80,6 +79,7 @@ static uint32_t violation_count[NUM_SENSORS] = {0};   // number of separate viol
 UART_HandleTypeDef huart1;
 static void UART1_Init(void);
 
+
 // printf-style output over UART1
 static void uart_printf(const char *fmt, ...)
 {
@@ -99,7 +99,8 @@ volatile uint32_t last_pressed = 0;
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	if (GPIO_Pin == USER_BUTTON_PIN) {
-		if (HAL_GetTick() - last_pressed < 50) return;   // ignore contact bounce
+		// ignore contact bounce
+		if (HAL_GetTick() - last_pressed < 50) return;
 		button_pressed = 1;
 		last_pressed = HAL_GetTick();
 	}
@@ -114,6 +115,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 //fix: make it wait 500 sec before doing status report
 
 //Oled Setups
+#include "../../Drivers/u8g2/csrc/u8g2.h"
 static I2C_HandleTypeDef hi2c_oled;
 static char oled_text[1024];
 static uint16_t oled_len = 0;
@@ -298,6 +300,7 @@ uint32_t tiltcheck(void){
 	rot_around_x += (gyro[0]) / 1000.0f * dt;
 	rot_around_y += (gyro[1]) / 1000.0f * dt;
 
+	//we choosing 120 as tilt point
 	return (fabsf(rot_around_x) >= 120 || fabsf(rot_around_y) >= 120);
 }
 //checking if its actually upright before the thing.. rescue else it wont save
@@ -519,20 +522,26 @@ int main(void)
 				BSP_LED_On(LED2);
 			}
 		} else if (press_detected && press_type == SINGLE_PRESS) {
+
+
+
 			if (mode == BATTLE_MODE) {
-				if (last_of_ee2028 % 2 == 0) {
-					laserCount += 3;
+				if (last_of_ee2028 %2 == 0) { //check not attacked
+					laserCount +=3;
 					if (laserCount > laserMax) laserCount = laserMax;
 					uart_printf("Added 3 Charges; Canister: [%d/10]\r\n\n", laserCount);
 					oled_printf("Added 3 Charges; Canister: [%d/10]\r\n\n", laserCount);
 
 					if (laserCount >= 5) {
-						laserCount -= 5;
+						laserCount -= 5; // auto fire
 						uart_printf(SHOTFIRED_ORANG "Shot Fired!!!" COLOR_RESET "; Canister: [%d/10]\r\n\n", laserCount);
 						oled_printf(SHOTFIRED_ORANG "Shot Fired!!!" COLOR_RESET "; Canister: [%d/10]\r\n\n", laserCount);
 					}
 				}
-			} else {
+			}
+
+
+			else {
 				print_status_report();           // STANDBY: user button single press
 			}
 		}
@@ -572,13 +581,17 @@ int main(void)
 		}
 
 		/* LED */
-		if (mode == BATTLE_MODE && last_of_ee2028 % 2 == 1) {
-			if (now - last_led >= LED_ATTACKED_MS) {
+		if (mode == BATTLE_MODE && last_of_ee2028 % 2 == 1)
+		{
+			if (now - last_led >= LED_ATTACKED_MS)
+			{
 				last_led += LED_ATTACKED_MS;
 				BSP_LED_Toggle(LED2);
 			}
-		} else if (mode == BATTLE_MODE) {
-			if (now - last_led >= LED_PERIOD_MS) {
+		} else if (mode == BATTLE_MODE)
+		{
+			if (now - last_led >= LED_PERIOD_MS)
+			{
 				last_led += LED_PERIOD_MS;
 				BSP_LED_Toggle(LED2);
 			}
